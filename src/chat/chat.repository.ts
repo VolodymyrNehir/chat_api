@@ -241,6 +241,10 @@ export class ChatRepository {
    * clicks would inflate the counter with empty generations and `generation`
    * would report button presses rather than real resets.
    *
+   * The `FOR UPDATE` lock on the session row contends with the trailing
+   * `sessions` update inside `recordExchange`, so a concurrent exchange
+   * cannot commit while this check-then-increment is in flight.
+   *
    * @returns the session's generation after the call
    */
   async resetSession(sessionId: string): Promise<number> {
