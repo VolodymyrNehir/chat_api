@@ -15,5 +15,20 @@ services:
       timeout: 5s
       retries: 10
 
+  api:
+    build: .
+    env_file: .env
+    environment:
+      # inside the compose network the database is reachable by service name,
+      # and the container always listens on 5432 internally regardless of the
+      # host-side POSTGRES_PORT used to publish the db service
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+    ports:
+      - "${HOST_PORT:-${PORT}}:${PORT}"
+    depends_on:
+      db:
+        condition: service_healthy
+
 volumes:
   pgdata:
