@@ -107,14 +107,17 @@ describe('OpenAiProvider', () => {
     expect('reasoning' in client.responses.create.mock.calls[1][0]).toBe(false);
   });
 
-  it('maps a 429 to UpstreamRateLimitedError, preserving retry-after', async () => {
+  it('maps a 429 to UpstreamRateLimitedError, preserving retry-after but not the provider message', async () => {
     const client = makeClient(() => {
       // The real SDK sets `headers` to a Fetch `Headers` instance, which
       // only supports `.get(name)`, not bracket/index access.
-      throw Object.assign(new Error('rate limited'), {
-        status: 429,
-        headers: new Headers({ 'retry-after': '7' }),
-      });
+      throw Object.assign(
+        new Error('rate limited for key sk-SECRET-MARKER-12345'),
+        {
+          status: 429,
+          headers: new Headers({ 'retry-after': '7' }),
+        },
+      );
     });
 
     let thrown: unknown;
@@ -129,31 +132,70 @@ describe('OpenAiProvider', () => {
 
     expect(thrown).toBeInstanceOf(UpstreamRateLimitedError);
     expect((thrown as UpstreamRateLimitedError).retryAfterSeconds).toBe(7);
+    // this branch never reads err.message, so it cannot leak it — pinned
+    // here so a future edit that starts interpolating it fails loudly
+    expect((thrown as UpstreamRateLimitedError).message).toBe(
+      'The model provider rate limited the request',
+    );
+    expect((thrown as UpstreamRateLimitedError).message).not.toContain(
+      'sk-SECRET-MARKER-12345',
+    );
   });
 
-  it('maps an SDK connection-timeout error to UpstreamTimeoutError', async () => {
+  it('maps an SDK connection-timeout error to UpstreamTimeoutError without leaking the provider message', async () => {
     const client = makeClient(() => {
-      throw new OpenAI.APIConnectionTimeoutError();
+      throw new OpenAI.APIConnectionTimeoutError({
+        message: 'timed out talking to sk-SECRET-MARKER-12345',
+      });
     });
 
-    await expect(
-      provider(client).complete({
+    let thrown: unknown;
+    try {
+      await provider(client).complete({
         model: 'gpt-5-nano',
         input: [{ role: 'user', content: 'hi' }],
-      }),
-    ).rejects.toBeInstanceOf(UpstreamTimeoutError);
+      });
+    } catch (e) {
+      thrown = e;
+    }
+
+    expect(thrown).toBeInstanceOf(UpstreamTimeoutError);
+    // this branch is a pure instanceof check, so it cannot leak the SDK
+    // error's own message either — same regression guard as above
+    expect((thrown as UpstreamTimeoutError).message).toBe(
+      'The model provider timed out',
+    );
+    expect((thrown as UpstreamTimeoutError).message).not.toContain(
+      'sk-SECRET-MARKER-12345',
+    );
   });
 
-  it('maps any other provider failure to UpstreamError', async () => {
+  it('maps any other provider failure to a fixed UpstreamError message, never the provider detail', async () => {
+    // Regression guard for the leak fixed in this change: OpenAI's own
+    // error text for an invalid key includes key fragments and a dashboard
+    // URL. The marker and URL below stand in for that and must never reach
+    // the thrown error's message — only the fixed, generic sentence may.
+    const leakedDetail =
+      'Incorrect API key provided: sk-SECRET-MARKER-12345. ' +
+      'You can find your API key at https://platform.openai.com/account/api-keys.';
     const client = makeClient(() => {
-      throw Object.assign(new Error('boom'), { status: 500 });
+      throw Object.assign(new Error(leakedDetail), { status: 401 });
     });
 
-    await expect(
-      provider(client).complete({
+    let thrown: unknown;
+    try {
+      await provider(client).complete({
         model: 'gpt-5-nano',
         input: [{ role: 'user', content: 'hi' }],
-      }),
-    ).rejects.toBeInstanceOf(UpstreamError);
+      });
+    } catch (e) {
+      thrown = e;
+    }
+
+    expect(thrown).toBeInstanceOf(UpstreamError);
+    const message = (thrown as UpstreamError).message;
+    expect(message).toBe('The model provider could not complete the request');
+    expect(message).not.toContain('sk-SECRET-MARKER-12345');
+    expect(message).not.toContain('https://platform.openai.com');
   });
 });
