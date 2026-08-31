@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/http-exception.filter';
 
@@ -14,6 +15,14 @@ async function bootstrap() {
     }),
   );
   app.useGlobalFilters(new HttpExceptionFilter());
+  const swagger = new DocumentBuilder()
+    .setTitle('Chat API')
+    .setDescription(
+      'Chat sessions over OpenAI with token usage and cost accounting',
+    )
+    .setVersion('1.0')
+    .build();
+  SwaggerModule.setup('docs', app, SwaggerModule.createDocument(app, swagger));
   const config = app.get(ConfigService);
   await app.listen(config.get<number>('PORT')!, '0.0.0.0');
 }
