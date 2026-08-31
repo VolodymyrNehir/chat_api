@@ -140,4 +140,61 @@ describe('buildContext', () => {
     const r = buildContext({ ...base, history }, count);
     expect(r.meta.estimatedInputTokens).toBe(count(r.input));
   });
+
+  it('drops a gap marker that does not fit within the budget', () => {
+    // markerText(N) is around 60 characters, so a low budget forces the marker to be dropped.
+    // Create 20-message history where marker would be ~70 tokens.
+    // Budget 15: fixed 6, remaining 9. Head cap floor(9*0.25)=2. After head uses maybe 2,
+    // tail gets 7 tokens, which fills some tail messages. Marker reserve (for
+    // markerText(20) ~70 tokens) far exceeds remaining, so marker is dropped.
+    const history = Array.from({ length: 20 }, (_, i) =>
+      msg(i % 2 === 0 ? 'user' : 'assistant', 'x'),
+    );
+    const r = buildContext(
+      {
+        ...base,
+        history,
+        budgetTokens: 15,
+        gapMarker: true,
+        pinnedHeadMessages: 2,
+      },
+      count,
+    );
+
+    // marker should not be present
+    expect(r.input.some((m) => m.content.includes('omitted'))).toBe(false);
+    // but omission is still reported in metadata
+    expect(r.meta.messagesOmitted).toBeGreaterThan(0);
+    // and the output must fit within budget
+    expect(count(r.input)).toBeLessThanOrEqual(15);
+  });
+
+  it('ensures output never exceeds budget across a range of histories and budgets', () => {
+    // Create a history of 20 single-token messages
+    const history = Array.from({ length: 20 }, (_, i) =>
+      msg(i % 2 === 0 ? 'user' : 'assistant', String(i)),
+    );
+
+    // Test across budgets that straddle the marker size
+    const budgets = [10, 13, 20, 40, 80, 200];
+    for (const budgetTokens of budgets) {
+      const r = buildContext(
+        {
+          ...base,
+          history,
+          budgetTokens,
+          gapMarker: true,
+          pinnedHeadMessages: 2,
+        },
+        count,
+      );
+
+      // Core invariant: output must never exceed the budget
+      const actualCost = count(r.input);
+      expect(actualCost).toBeLessThanOrEqual(budgetTokens);
+
+      // Estimate must be exact
+      expect(r.meta.estimatedInputTokens).toBe(actualCost);
+    }
+  });
 });

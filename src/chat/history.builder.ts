@@ -95,16 +95,23 @@ export function buildContext(
   let marker: ChatMessage | null = null;
   let markerCost = 0;
   if (omitted > 0 && a.gapMarker) {
-    markerCost = countTokens([
-      { role: 'system', content: markerText(omitted) },
+    // Reserve against the widest count the marker could ever print. The final
+    // omitted count can never exceed the whole history, so its digit width can
+    // never exceed this one — the reserve can't be invalidated by the refill.
+    const reserve = countTokens([
+      { role: 'system', content: markerText(a.history.length) },
     ]);
-    const refilled = fillTail(Math.max(0, remaining - markerCost));
-    tail = refilled.tail;
-    tailCost = refilled.cost;
-    omitted = a.history.length - head.length - tail.length;
-    marker =
-      omitted > 0 ? { role: 'system', content: markerText(omitted) } : null;
-    if (!marker) markerCost = 0;
+    if (reserve <= remaining) {
+      const refilled = fillTail(remaining - reserve);
+      tail = refilled.tail;
+      tailCost = refilled.cost;
+      // a smaller budget can only shrink the tail, so omitted stays > 0 here
+      omitted = a.history.length - head.length - tail.length;
+      marker = { role: 'system', content: markerText(omitted) };
+      markerCost = countTokens([marker]);
+    }
+    // reserve > remaining: the marker itself does not fit, so it is dropped.
+    // The omission is still reported through meta.messagesOmitted.
   }
 
   const input: ChatMessage[] = [
