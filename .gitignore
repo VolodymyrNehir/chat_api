@@ -1,0 +1,21 @@
+node_modules/
+dist/
+build/
+coverage/
+
+.env
+.env.local
+.env.*.local
+
+.idea/
+.vscode/
+.DS_Store
+
+*.log
+npm-debug.log*
+
+# task materials from the employer, not part of the solution
+*.docx
+
+# internal design docs, not part of the deliverable
+docs/superpowers/
