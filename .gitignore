@@ -19,3 +19,6 @@ npm-debug.log*
 
 # internal design docs, not part of the deliverable
 docs/superpowers/
+
+# subagent-driven-development scratch workspace
+.superpowers/
