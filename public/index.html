@@ -1,0 +1,103 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Chat API</title>
+<style>
+  body { font: 15px/1.5 system-ui, sans-serif; max-width: 760px; margin: 2rem auto; padding: 0 1rem; }
+  #log { border: 1px solid #ddd; border-radius: 8px; padding: 1rem; min-height: 240px; }
+  .msg { margin: .5rem 0; padding: .5rem .75rem; border-radius: 8px; white-space: pre-wrap; }
+  .user { background: #eef4ff; }
+  .assistant { background: #f4f4f4; }
+  .meta { color: #666; font-size: 12px; margin-top: .25rem; }
+  form { display: flex; gap: .5rem; margin-top: 1rem; }
+  input[type=text] { flex: 1; padding: .6rem; }
+  button { padding: .6rem 1rem; }
+  #totals { margin-top: 1rem; color: #444; font-size: 13px; }
+</style>
+
+<h1>Chat API</h1>
+<div id="log"></div>
+<form id="f">
+  <input type="text" id="q" placeholder="Повідомлення…" autocomplete="off" required>
+  <button>Надіслати</button>
+</form>
+<div id="totals"></div>
+<p><button id="new">Нова сесія</button> <a href="/docs">Swagger</a></p>
+
+<script>
+const log = document.getElementById('log');
+const totals = document.getElementById('totals');
+let sessionId = localStorage.getItem('sessionId');
+
+function add(role, text, meta) {
+  const d = document.createElement('div');
+  d.className = 'msg ' + role;
+  d.textContent = text;
+  if (meta) {
+    const m = document.createElement('div');
+    m.className = 'meta';
+    m.textContent = meta;
+    d.appendChild(m);
+  }
+  log.appendChild(d);
+  log.scrollTop = log.scrollHeight;
+}
+
+async function ensureSession() {
+  if (sessionId) return sessionId;
+  const r = await fetch('/sessions', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ title: 'Web UI' }),
+  });
+  sessionId = (await r.json()).id;
+  localStorage.setItem('sessionId', sessionId);
+  return sessionId;
+}
+
+async function load() {
+  if (!sessionId) return;
+  const r = await fetch('/sessions/' + sessionId);
+  if (!r.ok) { localStorage.removeItem('sessionId'); sessionId = null; return; }
+  const s = await r.json();
+  log.innerHTML = '';
+  s.messages.forEach(m => add(m.role, m.content));
+  totals.textContent =
+    `модель ${s.model} · повідомлень ${s.totals.messageCount} · ` +
+    `токенів in ${s.totals.inputTokens} / out ${s.totals.outputTokens} · ` +
+    `разом $${s.totals.totalCostUsd}`;
+}
+
+document.getElementById('f').onsubmit = async (e) => {
+  e.preventDefault();
+  const q = document.getElementById('q');
+  const content = q.value.trim();
+  if (!content) return;
+  q.value = '';
+  add('user', content);
+
+  const id = await ensureSession();
+  const r = await fetch('/sessions/' + id + '/messages', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ content }),
+  });
+  const body = await r.json();
+  if (!r.ok) { add('assistant', 'Помилка: ' + body.code + ' — ' + body.message); return; }
+
+  add('assistant', body.message.content,
+    `${body.usage.model} · in ${body.usage.inputTokens} (cached ${body.usage.cachedInputTokens}) · ` +
+    `out ${body.usage.outputTokens} (reasoning ${body.usage.reasoningTokens}) · ` +
+    `$${body.cost.totalCostUsd} · контекст ${body.context.messagesSent} повідомлень, ` +
+    `пропущено ${body.context.messagesOmitted}`);
+  await load();
+};
+
+document.getElementById('new').onclick = () => {
+  localStorage.removeItem('sessionId');
+  sessionId = null;
+  log.innerHTML = '';
+  totals.textContent = '';
+};
+
+load();
+</script>
