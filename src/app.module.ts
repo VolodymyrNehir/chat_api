@@ -6,6 +6,7 @@ import { HealthController } from './health/health.controller';
 import { Session } from './chat/entities/session.entity';
 import { Message } from './chat/entities/message.entity';
 import { Interaction } from './chat/entities/interaction.entity';
+import { ChatModule } from './chat/chat.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { Interaction } from './chat/entities/interaction.entity';
         synchronize: false,
       }),
     }),
+    ChatModule,
   ],
   controllers: [HealthController],
 })
