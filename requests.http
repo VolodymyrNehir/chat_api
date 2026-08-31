@@ -20,3 +20,21 @@ Content-Type: application/json
 
 ### Read the full history and accumulated cost
 GET http://localhost:3000/sessions/{{sessionId}}
+
+### Reset the context — same session id, clean history, cost restarts at zero
+POST http://localhost:3000/sessions/{{sessionId}}/reset
+
+### Read the session after reset — messages empty, totals zero, lifetime intact
+GET http://localhost:3000/sessions/{{sessionId}}
+
+### Send a message with an explicit model
+POST http://localhost:3000/sessions/{{sessionId}}/messages
+Content-Type: application/json
+
+{ "content": "Which model are you?", "model": "gpt-5-mini" }
+
+### An unsupported model is rejected with the list of supported ones
+POST http://localhost:3000/sessions/{{sessionId}}/messages
+Content-Type: application/json
+
+{ "content": "hi", "model": "gpt-9-imaginary" }

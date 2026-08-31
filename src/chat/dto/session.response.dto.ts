@@ -11,6 +11,13 @@ export class SessionResponseDto {
   @ApiProperty({ example: 'gpt-5-nano' })
   model: string;
 
+  @ApiProperty({
+    example: 1,
+    description:
+      'Current context generation. Resets performed = generation - 1.',
+  })
+  generation: number;
+
   @ApiProperty({ example: 'You are a helpful assistant.' })
   systemPrompt: string;
 
@@ -64,7 +71,7 @@ export class SessionMessageDto {
   createdAt: Date;
 }
 
-/** Response body of `GET /sessions/{id}`. */
+/** Response body of `GET /sessions/{id}` and `POST /sessions/{id}/reset`. */
 export class SessionDetailResponseDto {
   @ApiProperty({ example: '3f1c2b7a-1234-4abc-9def-0123456789ab' })
   id: string;
@@ -74,6 +81,13 @@ export class SessionDetailResponseDto {
 
   @ApiProperty({ example: 'gpt-5-nano' })
   model: string;
+
+  @ApiProperty({
+    example: 2,
+    description:
+      'Current context generation. Resets performed = generation - 1.',
+  })
+  generation: number;
 
   @ApiProperty({ example: 'You are a helpful assistant.' })
   systemPrompt: string;
@@ -89,4 +103,11 @@ export class SessionDetailResponseDto {
 
   @ApiProperty({ type: SessionTotalsDto })
   totals: SessionTotalsDto;
+
+  @ApiProperty({
+    type: SessionTotalsDto,
+    description:
+      'Totals across every generation, including those archived by reset',
+  })
+  lifetime: SessionTotalsDto;
 }

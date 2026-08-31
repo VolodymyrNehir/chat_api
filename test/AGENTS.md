@@ -4,12 +4,13 @@ Read the root `AGENTS.md` first.
 
 ## What is covered, and why only this
 
-Unit tests cover the two **pure** units and the two **boundaries**:
+Unit tests cover the three **pure** units and the two **boundaries**:
 
 | Spec | Covers | Why it exists |
 |---|---|---|
 | `pricing.service.spec.ts` | the rate table and the cost formula | money correctness is the assignment's core |
 | `history.builder.spec.ts` | the context window algorithm | the other thing being graded |
+| `model-resolver.spec.ts` | model resolution: default fallback, explicit override, an unsupported requested or default model, prototype-name rejection | the one place a wrong model is priced wrong, and pulling it out of `sendMessage` is what made it unit-testable at all |
 | `openai.provider.spec.ts` | usage normalisation and error mapping | the boundary where provider shapes and secrets could leak |
 | `http-exception.filter.spec.ts` | the error map and what reaches a client | the only client-facing error surface |
 | `env.validation.spec.ts` | the Joi schema | a bad value must stop the boot, not the first request |

@@ -13,9 +13,10 @@ A REST chat API that wraps OpenAI and accounts for what it costs. Sessions hold 
 message history; each new message is answered using a **token-budgeted window** of that
 history, and every API call's token usage and dollar cost is stored and reported.
 
-Built as step 3 of a staged technical assignment. `docs/superpowers/` holds the design
-spec and implementation plan — both gitignored, both still on disk, and the spec is the
-binding authority when code and README disagree.
+Built as step 3 of a staged technical assignment; step 4's change request (session reset
+and per-message model selection) has since landed on top of it. `docs/superpowers/` holds
+the design specs and implementation plans — all gitignored, all still on disk, and each
+spec is the binding authority when code and README disagree about the change it covers.
 
 ## Stack, and why versions are pinned
 
@@ -96,7 +97,9 @@ src/
                error surface)
   llm/         the seam in front of OpenAI — see src/llm/AGENTS.md
   chat/        sessions, messages, cost — see src/chat/AGENTS.md
-  migrations/  one InitialSchema; regenerate rather than stack while unreleased
+  migrations/  InitialSchema is released and referenced by a reported commit — from
+               here on, schema changes are additive, stacked migrations, never a
+               regenerated InitialSchema
 public/        index.html — the chat UI, no build step
 test/          see test/AGENTS.md
 ```

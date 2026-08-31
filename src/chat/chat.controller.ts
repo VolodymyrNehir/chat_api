@@ -33,6 +33,7 @@ export class ChatController {
     description: 'Session created',
     type: SessionResponseDto,
   })
+  @ApiResponse({ status: 400, description: 'Unsupported model' })
   createSession(@Body() dto: CreateSessionDto) {
     return this.chat.createSession(dto);
   }
@@ -44,6 +45,7 @@ export class ChatController {
     type: MessageResponseDto,
   })
   @ApiResponse({ status: 404, description: 'Session not found' })
+  @ApiResponse({ status: 400, description: 'Unsupported model' })
   @ApiResponse({
     status: 422,
     description: 'The new message alone does not fit the context budget',
@@ -56,12 +58,25 @@ export class ChatController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: SendMessageDto,
   ) {
-    return this.chat.sendMessage(id, dto.content);
+    return this.chat.sendMessage(id, dto.content, dto.model);
+  }
+
+  @Post(':id/reset')
+  @HttpCode(HttpStatus.OK)
+  @ApiOkResponse({
+    description:
+      'Context cleared. The session id is unchanged, the active history and totals are empty, and lifetime totals still report what the session has cost.',
+    type: SessionDetailResponseDto,
+  })
+  @ApiResponse({ status: 404, description: 'Session not found' })
+  resetSession(@Param('id', ParseUUIDPipe) id: string) {
+    return this.chat.resetSession(id);
   }
 
   @Get(':id')
   @ApiOkResponse({
-    description: 'Session with its full message history and totals',
+    description:
+      "Session with the active generation's message history and totals, plus lifetime totals across all generations.",
     type: SessionDetailResponseDto,
   })
   @ApiResponse({ status: 404, description: 'Session not found' })

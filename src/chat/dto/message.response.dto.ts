@@ -15,7 +15,10 @@ export class MessageDto {
 }
 
 export class UsageDto {
-  @ApiProperty({ example: 'gpt-5-nano' })
+  @ApiProperty({
+    example: 'gpt-5-nano',
+    description: 'The model actually used to answer this message.',
+  })
   model: string;
 
   @ApiProperty({ example: 412 })
