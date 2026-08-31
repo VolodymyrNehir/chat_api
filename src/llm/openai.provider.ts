@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import OpenAI from 'openai';
 import { LlmCompletion, LlmProvider, LlmRequest } from './llm.provider';
 import { PricingService } from '../chat/pricing.service';
@@ -40,6 +40,8 @@ interface ProviderError {
 
 @Injectable()
 export class OpenAiProvider extends LlmProvider {
+  private readonly logger = new Logger(OpenAiProvider.name);
+
   constructor(
     private readonly client: OpenAI,
     private readonly pricing: PricingService,
@@ -96,8 +98,16 @@ export class OpenAiProvider extends LlmProvider {
           Number.isFinite(retryAfter) ? retryAfter : undefined,
         );
       }
+      // The provider's raw message may contain key fragments, account
+      // details or dashboard URLs (OpenAI's own error text does exactly
+      // this). It is logged here, server-side only, and never crosses the
+      // HTTP boundary — the client gets a fixed, generic sentence via
+      // UpstreamError instead.
+      this.logger.error(
+        `OpenAI request failed: ${err?.message ?? 'unknown error'}`,
+      );
       throw new UpstreamError(
-        `Model provider request failed: ${err?.message ?? 'unknown error'}`,
+        'The model provider could not complete the request',
       );
     }
   }
