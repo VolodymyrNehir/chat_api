@@ -10,15 +10,26 @@ third without a concrete reason.
 
 **`chat.repository.ts`** wraps TypeORM. Its purpose is that `findActiveHistory()` — the
 query answering "what is this session's history right now" — lives in one named place.
-A later requirement (session reset, which keeps the session id but starts a fresh
-context) changes exactly that method. Keep it a single named method with its comment.
+Session reset (keeps the session id, starts a fresh context) changes exactly that method:
+it now takes the session's current `generation` and filters on it. It stays a single
+named method with its comment.
+
+Totals split the same way, but into three: a private `queryTotals(sessionId, generation?)`
+holds the one SQL query, and `findActiveTotals()` / `findLifetimeTotals()` are its two
+public callers — same query, generation filter present or absent. Do not duplicate the
+SQL between them; add a third caller instead if a third totals shape is ever needed.
 
 **`LlmProvider`** (defined in `../llm/`) sits in front of OpenAI so tests never touch the
 network. `ChatService` depends on the abstract class, never on the OpenAI SDK.
 
-`history.builder.ts` and `pricing.service.ts` are **pure**: no database, no network, no
-clock, no config reads. That is what makes them exactly testable. Keep them that way —
-the token counter is injected as a parameter for precisely this reason.
+`history.builder.ts`, `pricing.service.ts` and `model-resolver.ts` are **pure**: no
+database, no network, no clock, no config reads. That is what makes them exactly
+testable. Keep them that way — the token counter is injected as a parameter for precisely
+this reason. `model-resolver.ts` is the newest of the three, extracted out of
+`sendMessage` for a concrete reason: model selection is the one place a bug is invisible
+everywhere except the bill (usage and `usage.model` still look right; only the stored
+cost is priced off the wrong rate), and pulling it into a pure function is what makes it
+unit-testable at all (`test/model-resolver.spec.ts`).
 
 ## Money
 

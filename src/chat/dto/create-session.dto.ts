@@ -1,4 +1,10 @@
-import { IsOptional, IsString, Length, MaxLength } from 'class-validator';
+import {
+  IsOptional,
+  IsString,
+  Length,
+  Matches,
+  MaxLength,
+} from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateSessionDto {
@@ -21,5 +27,9 @@ export class CreateSessionDto {
   @IsOptional()
   @IsString()
   @MaxLength(64)
+  // rejects whitespace-only model (spaces, tabs, newlines), which would
+  // otherwise pass and only fail later as UNSUPPORTED_MODEL rather than
+  // VALIDATION_FAILED — see send-message.dto.ts's `model` for the same guard
+  @Matches(/\S/, { message: 'model must not be blank' })
   model?: string;
 }

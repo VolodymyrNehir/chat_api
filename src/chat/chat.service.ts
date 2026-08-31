@@ -6,7 +6,6 @@ import { buildContext } from './history.builder';
 import { LlmProvider } from '../llm/llm.provider';
 import { TokenCounterService } from '../llm/token-counter';
 import { PRICING_SOURCE } from '../config/pricing.config';
-import { UnsupportedModelError } from '../common/errors';
 import { resolveModel } from './model-resolver';
 
 /** matches the `numeric(18,10)` scale used for every cost column */
@@ -27,10 +26,11 @@ export class ChatService {
     systemPrompt?: string;
     model?: string;
   }) {
-    const model = dto.model ?? this.config.get<string>('DEFAULT_MODEL')!;
-    if (!this.pricing.isSupported(model)) {
-      throw new UnsupportedModelError(model, this.pricing.supportedModels());
-    }
+    const model = resolveModel(
+      dto.model,
+      this.config.get<string>('DEFAULT_MODEL')!,
+      this.pricing,
+    );
 
     const session = await this.repo.createSession({
       title: dto.title,
@@ -43,6 +43,7 @@ export class ChatService {
       id: session.id,
       title: session.title,
       model: session.model,
+      generation: session.generation,
       systemPrompt: session.systemPrompt,
       createdAt: session.createdAt,
       messageCount: 0,
@@ -187,7 +188,8 @@ export class ChatService {
    * reports what the session has cost in total.
    */
   async resetSession(sessionId: string) {
-    await this.repo.findSession(sessionId);
+    // repo.resetSession already throws SessionNotFoundError when the row is
+    // absent — a preceding findSession would only repeat that check
     await this.repo.resetSession(sessionId);
     return this.getSession(sessionId);
   }

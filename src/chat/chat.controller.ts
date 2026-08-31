@@ -33,6 +33,7 @@ export class ChatController {
     description: 'Session created',
     type: SessionResponseDto,
   })
+  @ApiResponse({ status: 400, description: 'Unsupported model' })
   createSession(@Body() dto: CreateSessionDto) {
     return this.chat.createSession(dto);
   }
@@ -74,7 +75,8 @@ export class ChatController {
 
   @Get(':id')
   @ApiOkResponse({
-    description: 'Session with its full message history and totals',
+    description:
+      "Session with the active generation's message history and totals, plus lifetime totals across all generations.",
     type: SessionDetailResponseDto,
   })
   @ApiResponse({ status: 404, description: 'Session not found' })

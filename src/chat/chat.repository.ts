@@ -120,22 +120,27 @@ export class ChatRepository {
     sessionId: string,
     generation?: number,
   ): Promise<SessionTotals> {
-    const filter = generation === undefined ? '' : ' AND generation = $2';
+    // qualified per table: an unqualified `generation` would resolve fine
+    // today, but if either column were ever dropped, an unqualified reference
+    // would silently bind to the outer `interactions` scope instead of
+    // failing to parse
+    const filter = (table: 'messages' | 'interactions') =>
+      generation === undefined ? '' : ` AND ${table}.generation = $2`;
     const params: (string | number)[] =
       generation === undefined ? [sessionId] : [sessionId, generation];
 
     const row = await this.dataSource.query<RawTotalsRow[]>(
       `SELECT
          (SELECT COUNT(*)::int FROM messages
-            WHERE session_id = $1${filter})                            AS message_count,
+            WHERE session_id = $1${filter('messages')})                 AS message_count,
          (SELECT COUNT(*)::int FROM interactions
-            WHERE session_id = $1${filter})                            AS interaction_count,
+            WHERE session_id = $1${filter('interactions')})             AS interaction_count,
          COALESCE(SUM(input_tokens), 0)::int                           AS input_tokens,
          COALESCE(SUM(cached_input_tokens), 0)::int                    AS cached_input_tokens,
          COALESCE(SUM(output_tokens), 0)::int                          AS output_tokens,
          COALESCE(SUM(reasoning_tokens), 0)::int                       AS reasoning_tokens,
          COALESCE(SUM(total_cost_usd), 0)::numeric(18,10)::text        AS total_cost_usd
-       FROM interactions WHERE session_id = $1${filter}`,
+       FROM interactions WHERE session_id = $1${filter('interactions')}`,
       params,
     );
     const r = row[0];
@@ -241,34 +246,36 @@ export class ChatRepository {
    * clicks would inflate the counter with empty generations and `generation`
    * would report button presses rather than real resets.
    *
-   * The `FOR UPDATE` lock on the session row contends with the trailing
-   * `sessions` update inside `recordExchange`, so a concurrent exchange
-   * cannot commit while this check-then-increment is in flight.
-   *
-   * @returns the session's generation after the call
+   * The `FOR UPDATE` lock on the session row serialises concurrent resets
+   * against each other and orders this transaction's commit relative to the
+   * trailing `sessions` update inside `recordExchange`. It does **not** make
+   * the emptiness check below see an exchange that is still in flight: that
+   * check reads committed rows only, and the model call it is racing against
+   * happens outside any transaction by design (see `sendMessage`). A message
+   * that has not yet committed will not be counted, reset will no-op, and the
+   * message will land in the generation reset just "cleared" — a known
+   * limitation, documented in the README, not a bug this lock closes.
    */
-  async resetSession(sessionId: string): Promise<number> {
+  async resetSession(sessionId: string): Promise<void> {
     return this.dataSource.transaction(async (manager) => {
       const rows = await manager.query<RawGenerationRow[]>(
         `SELECT generation FROM sessions WHERE id = $1 FOR UPDATE`,
         [sessionId],
       );
       if (rows.length === 0) throw new SessionNotFoundError(sessionId);
-      const current = Number(rows[0].generation);
+      const current = rows[0].generation;
 
       const [counted] = await manager.query<RawCountRow[]>(
         `SELECT COUNT(*)::int AS count FROM messages
           WHERE session_id = $1 AND generation = $2`,
         [sessionId, current],
       );
-      if (Number(counted.count) === 0) return current;
+      if (counted.count === 0) return;
 
-      const next = current + 1;
-      await manager.query(`UPDATE sessions SET generation = $2 WHERE id = $1`, [
-        sessionId,
-        next,
-      ]);
-      return next;
+      await manager.query(
+        `UPDATE sessions SET generation = $2, updated_at = now() WHERE id = $1`,
+        [sessionId, current + 1],
+      );
     });
   }
 }
