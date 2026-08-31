@@ -26,12 +26,15 @@ interface OpenAiResponseResult {
   };
 }
 
-/** shape of a provider error this adapter distinguishes on */
+/**
+ * Shape of a provider error this adapter distinguishes on. `headers` is
+ * typed as a Fetch `Headers`-like getter, not a plain record: the SDK sets
+ * it to a real `Headers` instance, which does not support bracket/index
+ * access — only `.get(name)`.
+ */
 interface ProviderError {
   status?: number;
-  headers?: Record<string, string>;
-  name?: string;
-  code?: string;
+  headers?: { get(name: string): string | null };
   message?: string;
 }
 
@@ -79,18 +82,19 @@ export class OpenAiProvider extends LlmProvider {
         latencyMs: Date.now() - startedAt,
       };
     } catch (e) {
+      // The SDK's own error classes never set `.name`/`.code`, so timeout
+      // detection has to go through `instanceof` against the real class,
+      // not a string comparison.
+      if (e instanceof OpenAI.APIConnectionTimeoutError) {
+        throw new UpstreamTimeoutError();
+      }
+
       const err = e as ProviderError;
       if (err?.status === 429) {
-        const retryAfter = Number(err.headers?.['retry-after']);
+        const retryAfter = Number(err.headers?.get('retry-after'));
         throw new UpstreamRateLimitedError(
           Number.isFinite(retryAfter) ? retryAfter : undefined,
         );
-      }
-      if (
-        err?.name === 'APIConnectionTimeoutError' ||
-        err?.code === 'ETIMEDOUT'
-      ) {
-        throw new UpstreamTimeoutError();
       }
       throw new UpstreamError(
         `Model provider request failed: ${err?.message ?? 'unknown error'}`,

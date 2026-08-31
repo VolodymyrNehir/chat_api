@@ -1,7 +1,11 @@
 import OpenAI from 'openai';
 import { OpenAiProvider } from '../src/llm/openai.provider';
 import { PricingService } from '../src/chat/pricing.service';
-import { UpstreamError, UpstreamRateLimitedError } from '../src/common/errors';
+import {
+  UpstreamError,
+  UpstreamRateLimitedError,
+  UpstreamTimeoutError,
+} from '../src/common/errors';
 
 /**
  * A fake OpenAI client exposing only the `responses.create` surface this
@@ -98,15 +102,38 @@ describe('OpenAiProvider', () => {
       model: 'gpt-4o-mini',
       input: [{ role: 'user', content: 'hi' }],
     });
-    expect(client.responses.create.mock.calls[1][0].reasoning).toBeUndefined();
+    // toBeUndefined() would also pass for `reasoning: undefined`, which the
+    // spec forbids — the key must be entirely absent from the request.
+    expect('reasoning' in client.responses.create.mock.calls[1][0]).toBe(false);
   });
 
-  it('maps a 429 to UpstreamRateLimitedError', async () => {
+  it('maps a 429 to UpstreamRateLimitedError, preserving retry-after', async () => {
     const client = makeClient(() => {
+      // The real SDK sets `headers` to a Fetch `Headers` instance, which
+      // only supports `.get(name)`, not bracket/index access.
       throw Object.assign(new Error('rate limited'), {
         status: 429,
-        headers: { 'retry-after': '7' },
+        headers: new Headers({ 'retry-after': '7' }),
       });
+    });
+
+    let thrown: unknown;
+    try {
+      await provider(client).complete({
+        model: 'gpt-5-nano',
+        input: [{ role: 'user', content: 'hi' }],
+      });
+    } catch (e) {
+      thrown = e;
+    }
+
+    expect(thrown).toBeInstanceOf(UpstreamRateLimitedError);
+    expect((thrown as UpstreamRateLimitedError).retryAfterSeconds).toBe(7);
+  });
+
+  it('maps an SDK connection-timeout error to UpstreamTimeoutError', async () => {
+    const client = makeClient(() => {
+      throw new OpenAI.APIConnectionTimeoutError();
     });
 
     await expect(
@@ -114,7 +141,7 @@ describe('OpenAiProvider', () => {
         model: 'gpt-5-nano',
         input: [{ role: 'user', content: 'hi' }],
       }),
-    ).rejects.toBeInstanceOf(UpstreamRateLimitedError);
+    ).rejects.toBeInstanceOf(UpstreamTimeoutError);
   });
 
   it('maps any other provider failure to UpstreamError', async () => {
