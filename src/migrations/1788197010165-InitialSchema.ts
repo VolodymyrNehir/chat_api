@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class InitialSchema1788196112250 implements MigrationInterface {
-  name = 'InitialSchema1788196112250';
+export class InitialSchema1788197010165 implements MigrationInterface {
+  name = 'InitialSchema1788197010165';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
@@ -19,9 +19,33 @@ export class InitialSchema1788196112250 implements MigrationInterface {
     await queryRunner.query(
       `CREATE INDEX "interactions_session_idx" ON "interactions"  ("session_id", "created_at") `,
     );
+    await queryRunner.query(
+      `ALTER TABLE "messages" ADD CONSTRAINT "FK_ff71b7760071ed9caba7f02beb4" FOREIGN KEY ("session_id") REFERENCES "sessions"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "interactions" ADD CONSTRAINT "FK_fb7e01bd56d3328af481e280439" FOREIGN KEY ("session_id") REFERENCES "sessions"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "interactions" ADD CONSTRAINT "FK_5c230822be1574761a0fb3f965c" FOREIGN KEY ("user_message_id") REFERENCES "messages"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "interactions" ADD CONSTRAINT "FK_093d9b08c06add68a2b583cf1f5" FOREIGN KEY ("assistant_message_id") REFERENCES "messages"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(
+      `ALTER TABLE "interactions" DROP CONSTRAINT "FK_093d9b08c06add68a2b583cf1f5"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "interactions" DROP CONSTRAINT "FK_5c230822be1574761a0fb3f965c"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "interactions" DROP CONSTRAINT "FK_fb7e01bd56d3328af481e280439"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "messages" DROP CONSTRAINT "FK_ff71b7760071ed9caba7f02beb4"`,
+    );
     await queryRunner.query(`DROP INDEX "public"."interactions_session_idx"`);
     await queryRunner.query(`DROP TABLE "interactions"`);
     await queryRunner.query(`DROP INDEX "public"."messages_session_seq_idx"`);

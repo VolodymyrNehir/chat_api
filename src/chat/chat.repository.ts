@@ -24,7 +24,14 @@ export interface RecordExchangeInput {
   assistantTokenCount: number;
   interaction: Omit<
     Interaction,
-    'id' | 'sessionId' | 'userMessageId' | 'assistantMessageId' | 'createdAt'
+    | 'id'
+    | 'sessionId'
+    | 'session'
+    | 'userMessageId'
+    | 'userMessage'
+    | 'assistantMessageId'
+    | 'assistantMessage'
+    | 'createdAt'
   >;
 }
 
@@ -45,6 +52,7 @@ interface RawNextSeqRow {
 /** shape of the pg driver error TypeORM wraps in QueryFailedError.driverError */
 interface PgDriverError {
   code?: string;
+  constraint?: string;
 }
 
 @Injectable()
@@ -154,10 +162,17 @@ export class ChatRepository {
         return { userMessage, assistantMessage, interaction };
       });
     } catch (e) {
-      // unique_violation on (session_id, seq): another request wrote first
+      // unique_violation on (session_id, seq): another request wrote first.
+      // Match on the specific constraint name, not just the error code, so a
+      // future unique constraint touched by this transaction isn't silently
+      // mislabeled as a sequence conflict.
+      const driverError =
+        e instanceof QueryFailedError
+          ? (e.driverError as PgDriverError | undefined)
+          : undefined;
       if (
-        e instanceof QueryFailedError &&
-        (e.driverError as PgDriverError | undefined)?.code === '23505'
+        driverError?.code === '23505' &&
+        driverError.constraint === 'messages_session_seq_uniq'
       ) {
         throw new SequenceConflictError(input.sessionId);
       }

@@ -3,8 +3,12 @@ import {
   CreateDateColumn,
   Entity,
   Index,
+  JoinColumn,
+  ManyToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
+import { Session } from './session.entity';
+import { Message } from './message.entity';
 
 @Entity('interactions')
 @Index('interactions_session_idx', ['sessionId', 'createdAt'])
@@ -15,11 +19,23 @@ export class Interaction {
   @Column({ type: 'uuid', name: 'session_id' })
   sessionId: string;
 
+  @ManyToOne(() => Session, { onDelete: 'CASCADE', nullable: false })
+  @JoinColumn({ name: 'session_id' })
+  session: Session;
+
   @Column({ type: 'uuid', name: 'user_message_id' })
   userMessageId: string;
 
+  @ManyToOne(() => Message, { onDelete: 'CASCADE', nullable: false })
+  @JoinColumn({ name: 'user_message_id' })
+  userMessage: Message;
+
   @Column({ type: 'uuid', name: 'assistant_message_id' })
   assistantMessageId: string;
+
+  @ManyToOne(() => Message, { onDelete: 'CASCADE', nullable: false })
+  @JoinColumn({ name: 'assistant_message_id' })
+  assistantMessage: Message;
 
   @Column({ type: 'varchar', length: 64 })
   model: string;

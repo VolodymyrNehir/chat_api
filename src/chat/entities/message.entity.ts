@@ -3,9 +3,12 @@ import {
   CreateDateColumn,
   Entity,
   Index,
+  JoinColumn,
+  ManyToOne,
   PrimaryGeneratedColumn,
   Unique,
 } from 'typeorm';
+import { Session } from './session.entity';
 
 export type MessageRole = 'user' | 'assistant';
 
@@ -18,6 +21,10 @@ export class Message {
 
   @Column({ type: 'uuid', name: 'session_id' })
   sessionId: string;
+
+  @ManyToOne(() => Session, { onDelete: 'CASCADE', nullable: false })
+  @JoinColumn({ name: 'session_id' })
+  session: Session;
 
   @Column({ type: 'int' })
   seq: number;
