@@ -97,7 +97,7 @@ export class ChatService {
       outputCostUsd: cost.outputCostUsd,
       totalCostUsd: cost.totalCostUsd,
       pricingSource: PRICING_SOURCE,
-      historyMessagesSent: built.meta.messagesSent,
+      historyMessagesSent: built.meta.historyMessagesSent,
       historyMessagesOmitted: built.meta.messagesOmitted,
       estimatedInputTokens: built.meta.estimatedInputTokens,
       latencyMs: completion.latencyMs,

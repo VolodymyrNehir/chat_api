@@ -28,6 +28,7 @@ describe('buildContext', () => {
     expect(r.input.map((m) => m.content)).toEqual(['SYS', 'aa', 'bb', 'NEW']);
     expect(r.meta.messagesOmitted).toBe(0);
     expect(r.meta.messagesSent).toBe(4);
+    expect(r.meta.historyMessagesSent).toBe(2);
   });
 
   it('puts the system prompt first and the new message last', () => {
@@ -132,6 +133,28 @@ describe('buildContext', () => {
   it('counts messagesSent as the length of the produced input array', () => {
     const history = [msg('user', 'aa'), msg('assistant', 'bb')];
     const r = buildContext({ ...base, history }, count);
+    expect(r.meta.messagesSent).toBe(r.input.length);
+  });
+
+  it('counts historyMessagesSent as head.length + tail.length, distinct from the full messagesSent', () => {
+    // same head+tail scenario as above: 2 pinned head messages, 2 newest tail
+    // messages, 2 middle messages dropped
+    const history = [
+      msg('user', 'H1'.repeat(5)), // 10  head
+      msg('assistant', 'H2'.repeat(5)), // 10  head
+      msg('user', 'M1'.repeat(20)), // 40  middle (dropped)
+      msg('assistant', 'M2'.repeat(20)), // 40  middle (dropped)
+      msg('user', 'T1'.repeat(10)), // 20  tail
+      msg('assistant', 'T2'.repeat(10)), // 20  tail
+    ];
+    const r = buildContext({ ...base, history }, count);
+
+    // only the 4 history messages actually carried into the model call —
+    // NOT the system prompt, gap marker or new user message
+    expect(r.meta.historyMessagesSent).toBe(4);
+    // messagesSent additionally counts the system prompt and the new user
+    // message (no gap marker here, gapMarker: false in `base`)
+    expect(r.meta.messagesSent).toBe(r.meta.historyMessagesSent + 2);
     expect(r.meta.messagesSent).toBe(r.input.length);
   });
 

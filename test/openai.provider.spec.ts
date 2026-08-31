@@ -142,6 +142,34 @@ describe('OpenAiProvider', () => {
     );
   });
 
+  it('maps a 429 with no retry-after header to UpstreamRateLimitedError with retryAfterSeconds undefined', async () => {
+    const client = makeClient(() => {
+      throw Object.assign(new Error('rate limited'), {
+        status: 429,
+        // an absent header: Headers#get returns null, not '0'
+        headers: new Headers({}),
+      });
+    });
+
+    let thrown: unknown;
+    try {
+      await provider(client).complete({
+        model: 'gpt-5-nano',
+        input: [{ role: 'user', content: 'hi' }],
+      });
+    } catch (e) {
+      thrown = e;
+    }
+
+    expect(thrown).toBeInstanceOf(UpstreamRateLimitedError);
+    // Number(null) is 0 and Number.isFinite(0) is true — this pins the fix
+    // that treats a genuinely absent header as "no retry-after", not "retry
+    // immediately".
+    expect(
+      (thrown as UpstreamRateLimitedError).retryAfterSeconds,
+    ).toBeUndefined();
+  });
+
   it('maps an SDK connection-timeout error to UpstreamTimeoutError without leaking the provider message', async () => {
     const client = makeClient(() => {
       throw new OpenAI.APIConnectionTimeoutError({
@@ -197,5 +225,65 @@ describe('OpenAiProvider', () => {
     expect(message).toBe('The model provider could not complete the request');
     expect(message).not.toContain('sk-SECRET-MARKER-12345');
     expect(message).not.toContain('https://platform.openai.com');
+  });
+
+  it('throws UpstreamError when the response status is not completed', async () => {
+    const client = makeClient(() => ({
+      status: 'incomplete',
+      output_text: '',
+      usage: { input_tokens: 10, output_tokens: 0 },
+    }));
+
+    let thrown: unknown;
+    try {
+      await provider(client).complete({
+        model: 'gpt-5-nano',
+        input: [{ role: 'user', content: 'hi' }],
+      });
+    } catch (e) {
+      thrown = e;
+    }
+
+    expect(thrown).toBeInstanceOf(UpstreamError);
+    expect((thrown as UpstreamError).message).toBe(
+      'The model provider could not complete the request',
+    );
+  });
+
+  it('throws UpstreamError when the response completes with empty output_text (e.g. a refusal or reasoning-only output)', async () => {
+    const client = makeClient(() => ({
+      status: 'completed',
+      output_text: '',
+      usage: { input_tokens: 10, output_tokens: 5 },
+    }));
+
+    let thrown: unknown;
+    try {
+      await provider(client).complete({
+        model: 'gpt-5-nano',
+        input: [{ role: 'user', content: 'hi' }],
+      });
+    } catch (e) {
+      thrown = e;
+    }
+
+    expect(thrown).toBeInstanceOf(UpstreamError);
+    expect((thrown as UpstreamError).message).toBe(
+      'The model provider could not complete the request',
+    );
+  });
+
+  it('accepts a response with no status field at all, as long as output_text is non-empty', async () => {
+    const client = makeClient(() => ({
+      output_text: 'hi there',
+      usage: { input_tokens: 10, output_tokens: 5 },
+    }));
+
+    const r = await provider(client).complete({
+      model: 'gpt-5-nano',
+      input: [{ role: 'user', content: 'hi' }],
+    });
+
+    expect(r.text).toBe('hi there');
   });
 });

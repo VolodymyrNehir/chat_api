@@ -14,4 +14,8 @@ export default new DataSource({
   entities: [Session, Message, Interaction],
   migrations: ['src/migrations/*.ts', 'dist/migrations/*.js'],
   synchronize: false,
+  // gen_random_uuid() is built into Postgres >= 13 via pgcrypto, unlike
+  // uuid_generate_v4() which needs the superuser-only uuid-ossp extension —
+  // see docs/superpowers/specs/2026-08-31-chat-api-design.md §4
+  uuidExtension: 'pgcrypto',
 });

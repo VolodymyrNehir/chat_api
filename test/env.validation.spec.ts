@@ -33,6 +33,14 @@ describe('envValidationSchema', () => {
     expect(error?.message).toContain('OPENAI_API_KEY');
   });
 
+  it('rejects a DEFAULT_MODEL outside the pricing table', () => {
+    const { error } = envValidationSchema.validate({
+      ...valid,
+      DEFAULT_MODEL: 'gpt-4.5-imaginary',
+    });
+    expect(error?.message).toContain('DEFAULT_MODEL');
+  });
+
   it('rejects a head share outside [0, 1)', () => {
     const { error } = envValidationSchema.validate({
       ...valid,
@@ -42,7 +50,12 @@ describe('envValidationSchema', () => {
   });
 
   it('coerces numeric strings to numbers', () => {
-    const { value } = envValidationSchema.validate(valid);
+    // Joi's ObjectSchema.validate() types `.value` as `any`; assert the one
+    // field this test reads so no `@typescript-eslint/no-unsafe-*` rule is
+    // needed just for this file.
+    const { value } = envValidationSchema.validate(valid) as {
+      value: { HISTORY_TOKEN_BUDGET: number };
+    };
     expect(value.HISTORY_TOKEN_BUDGET).toBe(8000);
   });
 });

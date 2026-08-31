@@ -1,4 +1,5 @@
 import * as Joi from 'joi';
+import { PRICING } from './pricing.config';
 
 export const envValidationSchema = Joi.object({
   PORT: Joi.number().port().default(3000),
@@ -16,7 +17,9 @@ export const envValidationSchema = Joi.object({
   OPENAI_TIMEOUT_MS: Joi.number().integer().min(1000).default(60000),
   OPENAI_MAX_RETRIES: Joi.number().integer().min(0).max(5).default(2),
 
-  DEFAULT_MODEL: Joi.string().required(),
+  DEFAULT_MODEL: Joi.string()
+    .valid(...Object.keys(PRICING))
+    .required(),
   DEFAULT_SYSTEM_PROMPT: Joi.string().required(),
   REASONING_EFFORT: Joi.string()
     .valid('minimal', 'low', 'medium', 'high')

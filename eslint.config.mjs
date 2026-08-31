@@ -34,7 +34,9 @@ export default tseslint.config(
     },
   },
   {
-    files: ['test/**/*.ts'],
+    // only this file indexes into an untyped jest.Mock's `.mock.calls` to
+    // inspect raw request params — every other test file is fully typed
+    files: ['test/openai.provider.spec.ts'],
     rules: {
       '@typescript-eslint/no-unsafe-assignment': 'off',
       '@typescript-eslint/no-unsafe-member-access': 'off',

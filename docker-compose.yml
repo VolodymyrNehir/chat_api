@@ -29,6 +29,14 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      # 127.0.0.1, not localhost: this alpine image resolves "localhost" to
+      # ::1 first, and the app listens on 0.0.0.0 (IPv4 only), so
+      # "localhost" would connection-refuse forever
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:${PORT}/health || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
 volumes:
   pgdata:

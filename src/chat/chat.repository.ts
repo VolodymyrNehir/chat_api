@@ -155,9 +155,10 @@ export class ChatRepository {
           assistantMessageId: assistantMessage.id,
         });
 
-        await manager.update(Session, input.sessionId, {
-          updatedAt: new Date(),
-        });
+        // @UpdateDateColumn on Session already sets updated_at to
+        // CURRENT_TIMESTAMP on every update() call, even with no other
+        // columns in the set — no need to pass it explicitly
+        await manager.update(Session, input.sessionId, {});
 
         return { userMessage, assistantMessage, interaction };
       });

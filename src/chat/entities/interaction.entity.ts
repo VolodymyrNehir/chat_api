@@ -71,6 +71,10 @@ export class Interaction {
   @Column({ type: 'varchar', length: 64, name: 'pricing_source' })
   pricingSource: string;
 
+  // count of history messages actually carried into the model call
+  // (head.length + tail.length) — NOT the full input array length, which
+  // also counts the system prompt, the gap marker and the new user message
+  // (that full count is `context.messagesSent` on the wire, see chat.service.ts)
   @Column({ type: 'int', name: 'history_messages_sent' })
   historyMessagesSent: number;
 

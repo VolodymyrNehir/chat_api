@@ -17,39 +17,39 @@ export interface ModelPricing {
 export const PRICING_SOURCE = 'openai-public-2026-08-31';
 
 export const PRICING: Record<string, ModelPricing> = {
-  'gpt-5': {
+  'gpt-5': Object.freeze({
     model: 'gpt-5',
     inputPerMTok: 1.25,
     cachedInputPerMTok: 0.125,
     outputPerMTok: 10.0,
     supportsReasoning: true,
-  },
-  'gpt-5-mini': {
+  }),
+  'gpt-5-mini': Object.freeze({
     model: 'gpt-5-mini',
     inputPerMTok: 0.25,
     cachedInputPerMTok: 0.025,
     outputPerMTok: 2.0,
     supportsReasoning: true,
-  },
-  'gpt-5-nano': {
+  }),
+  'gpt-5-nano': Object.freeze({
     model: 'gpt-5-nano',
     inputPerMTok: 0.05,
     cachedInputPerMTok: 0.005,
     outputPerMTok: 0.4,
     supportsReasoning: true,
-  },
-  'gpt-4.1-mini': {
+  }),
+  'gpt-4.1-mini': Object.freeze({
     model: 'gpt-4.1-mini',
     inputPerMTok: 0.4,
     cachedInputPerMTok: 0.1,
     outputPerMTok: 1.6,
     supportsReasoning: false,
-  },
-  'gpt-4o-mini': {
+  }),
+  'gpt-4o-mini': Object.freeze({
     model: 'gpt-4o-mini',
     inputPerMTok: 0.15,
     cachedInputPerMTok: 0.075,
     outputPerMTok: 0.6,
     supportsReasoning: false,
-  },
+  }),
 };

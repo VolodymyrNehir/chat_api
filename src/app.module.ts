@@ -25,6 +25,9 @@ import { ChatModule } from './chat/chat.module';
         database: c.get<string>('POSTGRES_DB'),
         entities: [Session, Message, Interaction],
         synchronize: false,
+        // gen_random_uuid() is built into Postgres >= 13 via pgcrypto, unlike
+        // uuid_generate_v4() which needs the superuser-only uuid-ossp extension
+        uuidExtension: 'pgcrypto' as const,
       }),
     }),
     ChatModule,

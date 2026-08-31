@@ -27,6 +27,8 @@ async function bootstrap() {
     .build();
   SwaggerModule.setup('docs', app, SwaggerModule.createDocument(app, swagger));
   const config = app.get(ConfigService);
+  // `!`: Joi defaults PORT to 3000 and validates it at boot, so this is
+  // never actually undefined despite ConfigService's optional-looking type
   await app.listen(config.get<number>('PORT')!, '0.0.0.0');
 }
 void bootstrap();

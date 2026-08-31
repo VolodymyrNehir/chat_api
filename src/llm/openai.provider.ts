@@ -17,6 +17,8 @@ import {
  * structurally assignable to this type without a cast.
  */
 interface OpenAiResponseResult {
+  /** 'completed' | 'failed' | 'in_progress' | 'cancelled' | 'queued' | 'incomplete' */
+  status?: string;
   output_text: string;
   usage?: {
     input_tokens: number;
@@ -68,21 +70,9 @@ export class OpenAiProvider extends LlmProvider {
         : {}),
     };
 
+    let res: OpenAiResponseResult;
     try {
-      const res: OpenAiResponseResult =
-        await this.client.responses.create(params);
-
-      const usage = res.usage;
-      return {
-        text: res.output_text ?? '',
-        usage: {
-          inputTokens: usage?.input_tokens ?? 0,
-          cachedInputTokens: usage?.input_tokens_details?.cached_tokens ?? 0,
-          outputTokens: usage?.output_tokens ?? 0,
-          reasoningTokens: usage?.output_tokens_details?.reasoning_tokens ?? 0,
-        },
-        latencyMs: Date.now() - startedAt,
-      };
+      res = await this.client.responses.create(params);
     } catch (e) {
       // The SDK's own error classes never set `.name`/`.code`, so timeout
       // detection has to go through `instanceof` against the real class,
@@ -93,7 +83,9 @@ export class OpenAiProvider extends LlmProvider {
 
       const err = e as ProviderError;
       if (err?.status === 429) {
-        const retryAfter = Number(err.headers?.get('retry-after'));
+        const raw = err.headers?.get('retry-after');
+        const retryAfter =
+          raw === null || raw === undefined ? NaN : Number(raw);
         throw new UpstreamRateLimitedError(
           Number.isFinite(retryAfter) ? retryAfter : undefined,
         );
@@ -110,5 +102,41 @@ export class OpenAiProvider extends LlmProvider {
         'The model provider could not complete the request',
       );
     }
+
+    // A non-'completed' status (incomplete, failed, cancelled, ...) or an
+    // empty output_text (e.g. the only output item was a refusal or a
+    // reasoning block) means there is nothing usable to store or bill for.
+    // Both are treated as upstream failures rather than silently stored as
+    // an empty assistant message. The detail is logged server-side only —
+    // the client gets the same fixed, generic UpstreamError sentence as
+    // every other provider failure.
+    if (res.status !== undefined && res.status !== 'completed') {
+      this.logger.error(
+        `OpenAI response did not complete: status=${res.status}`,
+      );
+      throw new UpstreamError(
+        'The model provider could not complete the request',
+      );
+    }
+    if (!res.output_text) {
+      this.logger.error(
+        'OpenAI response completed with no usable output text (empty, refusal, or reasoning-only output)',
+      );
+      throw new UpstreamError(
+        'The model provider could not complete the request',
+      );
+    }
+
+    const usage = res.usage;
+    return {
+      text: res.output_text,
+      usage: {
+        inputTokens: usage?.input_tokens ?? 0,
+        cachedInputTokens: usage?.input_tokens_details?.cached_tokens ?? 0,
+        outputTokens: usage?.output_tokens ?? 0,
+        reasoningTokens: usage?.output_tokens_details?.reasoning_tokens ?? 0,
+      },
+      latencyMs: Date.now() - startedAt,
+    };
   }
 }

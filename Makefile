@@ -1,6 +1,3 @@
--include .env
-export
-
 .DEFAULT_GOAL := help
 COMPOSE := docker compose
 
@@ -32,7 +29,7 @@ test: ## Run unit tests
 	npm test
 
 db: ## Open psql in the database container
-	$(COMPOSE) exec db psql -U $${POSTGRES_USER} -d $${POSTGRES_DB}
+	$(COMPOSE) exec db sh -c 'psql -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"'
 
 sh: ## Open a shell in the api container
 	$(COMPOSE) exec api sh

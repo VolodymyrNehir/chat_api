@@ -24,7 +24,10 @@ export interface BuildContextInput {
 export interface BuiltContext {
   input: ChatMessage[];
   meta: {
+    /** length of `input`: system prompt + head + gap marker + tail + new user message */
     messagesSent: number;
+    /** history messages actually carried into `input` (head.length + tail.length) */
+    historyMessagesSent: number;
     messagesOmitted: number;
     estimatedInputTokens: number;
   };
@@ -126,6 +129,7 @@ export function buildContext(
     input,
     meta: {
       messagesSent: input.length,
+      historyMessagesSent: head.length + tail.length,
       messagesOmitted: omitted,
       estimatedInputTokens: fixedCost + headCost + tailCost + markerCost,
     },

@@ -21,7 +21,7 @@ import { PricingService } from '../chat/pricing.service';
             maxRetries: c.get<number>('OPENAI_MAX_RETRIES'),
           }),
           pricing,
-          c.get<string>('REASONING_EFFORT') ?? 'low',
+          c.get<string>('REASONING_EFFORT')!,
         ),
     },
   ],

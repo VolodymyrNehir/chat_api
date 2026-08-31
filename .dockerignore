@@ -4,9 +4,8 @@ dist
 .idea
 docs
 test
-.env
-.env.local
-.env.*.local
+.env*
+!.env.example
 *.docx
 .superpowers/
 coverage/
