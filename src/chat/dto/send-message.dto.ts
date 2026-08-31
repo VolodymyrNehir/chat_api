@@ -1,5 +1,11 @@
-import { IsString, Matches, MinLength } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import {
+  IsOptional,
+  IsString,
+  Matches,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class SendMessageDto {
   @ApiProperty({ example: 'Привіт! Що ти вмієш?' })
@@ -10,4 +16,15 @@ export class SendMessageDto {
   // model call
   @Matches(/\S/, { message: 'content must not be blank' })
   content: string;
+
+  @ApiPropertyOptional({
+    example: 'gpt-5-mini',
+    description:
+      'Overrides the session default for this message only. Must be present in the pricing table.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  @Matches(/\S/, { message: 'model must not be blank' })
+  model?: string;
 }

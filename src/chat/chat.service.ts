@@ -7,6 +7,7 @@ import { LlmProvider } from '../llm/llm.provider';
 import { TokenCounterService } from '../llm/token-counter';
 import { PRICING_SOURCE } from '../config/pricing.config';
 import { UnsupportedModelError } from '../common/errors';
+import { resolveModel } from './model-resolver';
 
 /** matches the `numeric(18,10)` scale used for every cost column */
 const ZERO_COST_USD = '0.0000000000';
@@ -49,14 +50,26 @@ export class ChatService {
     };
   }
 
-  async sendMessage(sessionId: string, content: string) {
+  async sendMessage(
+    sessionId: string,
+    content: string,
+    requestedModel?: string,
+  ) {
     const maxChars = this.config.get<number>('MAX_MESSAGE_CHARS')!;
     if (content.length > maxChars) {
       throw new BadRequestException(`content exceeds ${maxChars} characters`);
     }
 
     const session = await this.repo.findSession(sessionId);
-    const history = await this.repo.findActiveHistory(sessionId);
+    const model = resolveModel(requestedModel, session.model, this.pricing);
+
+    // Read the generation once, before the model call. If a reset lands while
+    // the call is in flight, this exchange is written into the generation the
+    // question was asked in — the fresh context stays clean, which is the
+    // failure mode worth having.
+    const generation = session.generation;
+
+    const history = await this.repo.findActiveHistory(sessionId, generation);
 
     const budgetTokens = this.config.get<number>('HISTORY_TOKEN_BUDGET')!;
 
@@ -82,13 +95,13 @@ export class ChatService {
     // the network call happens outside any transaction: a failed call must
     // not leave a user message or interaction row behind
     const completion = await this.llm.complete({
-      model: session.model,
+      model,
       input: built.input,
     });
-    const cost = this.pricing.calculate(session.model, completion.usage);
+    const cost = this.pricing.calculate(model, completion.usage);
 
     const interaction: RecordExchangeInput['interaction'] = {
-      model: session.model,
+      model,
       inputTokens: completion.usage.inputTokens,
       cachedInputTokens: completion.usage.cachedInputTokens,
       outputTokens: completion.usage.outputTokens,
@@ -105,6 +118,7 @@ export class ChatService {
 
     const { assistantMessage } = await this.repo.recordExchange({
       sessionId,
+      generation,
       userContent: content,
       userTokenCount: this.tokens.count([{ role: 'user', content }]),
       assistantContent: completion.text,
@@ -114,7 +128,7 @@ export class ChatService {
       interaction,
     });
 
-    const totals = await this.repo.findTotals(sessionId);
+    const totals = await this.repo.findActiveTotals(sessionId, generation);
 
     return {
       sessionId,
@@ -124,7 +138,7 @@ export class ChatService {
         content: assistantMessage.content,
         createdAt: assistantMessage.createdAt,
       },
-      usage: { model: session.model, ...completion.usage },
+      usage: { model, ...completion.usage },
       cost: { ...cost, currency: 'USD' },
       context: {
         messagesSent: built.meta.messagesSent,
@@ -141,13 +155,17 @@ export class ChatService {
 
   async getSession(sessionId: string) {
     const session = await this.repo.findSession(sessionId);
-    const messages = await this.repo.findActiveHistory(sessionId);
-    const totals = await this.repo.findTotals(sessionId);
+    const [messages, totals, lifetime] = await Promise.all([
+      this.repo.findActiveHistory(sessionId, session.generation),
+      this.repo.findActiveTotals(sessionId, session.generation),
+      this.repo.findLifetimeTotals(sessionId),
+    ]);
 
     return {
       id: session.id,
       title: session.title,
       model: session.model,
+      generation: session.generation,
       systemPrompt: session.systemPrompt,
       createdAt: session.createdAt,
       updatedAt: session.updatedAt,
@@ -159,6 +177,18 @@ export class ChatService {
         createdAt: m.createdAt,
       })),
       totals,
+      lifetime,
     };
+  }
+
+  /**
+   * Starts a fresh context on the same session id. The previous generation is
+   * archived, not deleted: `totals` restarts at zero while `lifetime` still
+   * reports what the session has cost in total.
+   */
+  async resetSession(sessionId: string) {
+    await this.repo.findSession(sessionId);
+    await this.repo.resetSession(sessionId);
+    return this.getSession(sessionId);
   }
 }
