@@ -22,7 +22,7 @@ const SCALE = 10;
 @Injectable()
 export class PricingService {
   isSupported(model: string): boolean {
-    return model in PRICING;
+    return Object.hasOwn(PRICING, model);
   }
 
   supportedModels(): string[] {
@@ -30,9 +30,10 @@ export class PricingService {
   }
 
   get(model: string): ModelPricing {
-    const rate = PRICING[model];
-    if (!rate) throw new UnsupportedModelError(model, this.supportedModels());
-    return rate;
+    if (!Object.hasOwn(PRICING, model)) {
+      throw new UnsupportedModelError(model, this.supportedModels());
+    }
+    return PRICING[model];
   }
 
   calculate(model: string, usage: TokenUsage): CostBreakdown {

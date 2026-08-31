@@ -58,11 +58,12 @@ describe('PricingService', () => {
   });
 
   it('clamps billable input when cached exceeds total input', () => {
+    // billable 0/1e6*0.05 = 0 ; cached 400/1e6*0.005 = 0.000002
     const r = svc.calculate(
       'gpt-5-nano',
       usage({ inputTokens: 100, cachedInputTokens: 400 }),
     );
-    expect(Number(r.inputCostUsd)).toBeGreaterThanOrEqual(0);
+    expect(r.inputCostUsd).toBe('0.0000020000');
   });
 
   it('returns zero cost for zero usage', () => {
@@ -88,5 +89,12 @@ describe('PricingService', () => {
     } catch (e) {
       expect((e as UnsupportedModelError).supported).toContain('gpt-5-nano');
     }
+  });
+
+  it('rejects prototype-chain names like constructor', () => {
+    expect(svc.isSupported('constructor')).toBe(false);
+    expect(() => svc.calculate('constructor', usage())).toThrow(
+      UnsupportedModelError,
+    );
   });
 });
