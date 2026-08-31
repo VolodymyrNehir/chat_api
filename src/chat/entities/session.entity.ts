@@ -20,6 +20,14 @@ export class Session {
   @Column({ type: 'varchar', length: 64 })
   model: string;
 
+  /**
+   * Current context generation. Reset moves it forward; it never goes back.
+   * Everything written under an earlier generation stays in the database —
+   * see the reset rationale in the design document.
+   */
+  @Column({ type: 'int', default: 1 })
+  generation: number;
+
   @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
   createdAt: Date;
 

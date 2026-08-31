@@ -27,6 +27,7 @@ export interface RecordExchangeInput {
     | 'id'
     | 'sessionId'
     | 'session'
+    | 'generation'
     | 'userMessageId'
     | 'userMessage'
     | 'assistantMessageId'

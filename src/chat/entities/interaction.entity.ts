@@ -12,6 +12,7 @@ import { Message } from './message.entity';
 
 @Entity('interactions')
 @Index('interactions_session_idx', ['sessionId', 'createdAt'])
+@Index('interactions_session_generation_idx', ['sessionId', 'generation'])
 export class Interaction {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -22,6 +23,10 @@ export class Interaction {
   @ManyToOne(() => Session, { onDelete: 'CASCADE', nullable: false })
   @JoinColumn({ name: 'session_id' })
   session: Session;
+
+  /** the generation this interaction was billed under */
+  @Column({ type: 'int', default: 1 })
+  generation: number;
 
   @Column({ type: 'uuid', name: 'user_message_id' })
   userMessageId: string;
