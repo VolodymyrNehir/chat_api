@@ -2,6 +2,8 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   ParseUUIDPipe,
   Post,
@@ -20,6 +22,7 @@ export class ChatController {
   }
 
   @Post(':id/messages')
+  @HttpCode(HttpStatus.OK)
   sendMessage(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: SendMessageDto,

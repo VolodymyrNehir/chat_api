@@ -8,6 +8,9 @@ import { TokenCounterService } from '../llm/token-counter';
 import { PRICING_SOURCE } from '../config/pricing.config';
 import { UnsupportedModelError } from '../common/errors';
 
+/** matches the `numeric(18,10)` scale used for every cost column */
+const ZERO_COST_USD = '0.0000000000';
+
 @Injectable()
 export class ChatService {
   constructor(
@@ -42,7 +45,7 @@ export class ChatService {
       systemPrompt: session.systemPrompt,
       createdAt: session.createdAt,
       messageCount: 0,
-      totalCostUsd: (0).toFixed(10),
+      totalCostUsd: ZERO_COST_USD,
     };
   }
 
